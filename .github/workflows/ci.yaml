@@ -1,0 +1,46 @@
+name: CI and GitOps Trigger
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Login to Docker Hub (Replace with your credentials)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 2. Build and Push Image
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: TommyItzhar/gitops:${{ github.sha }}
+
+      # 3. Checkout the HELM Repository
+      - name: Checkout Git
+        uses: actions/checkout@v4
+        with:
+          repository: TommyItzhar/gitops # Your Helm Repo name
+          token: ${{ secrets.git_fuck }}
+          path: TommyItzhar/gitops
+
+      # 4. Update the tag in values-dev.yaml
+      - name: Update Image Tag
+        run: |
+          cd gitops
+          yq -i '.image.tag = "${{ github.sha }}"' values-dev.yaml
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add values-dev.yaml
+          git commit -m "deploy: update image tag to ${{ github.sha }}"
+          git push
